@@ -1,23 +1,3 @@
-/*
-   -------------------------------------------------------------------------------------
-   HX711_ADC
-   Arduino library for HX711 24-Bit Analog-to-Digital Converter for Weight Scales
-   Olav Kallhovd sept2017
-   -------------------------------------------------------------------------------------
-*/
-
-/*
-   Settling time (number of samples) and data filtering can be adjusted in the config.h file
-   For calibration and storing the calibration value in eeprom, see example file "Calibration.ino"
-
-   The update() function checks for new data and starts the next conversion. In order to acheive maximum effective
-   sample rate, update() should be called at least as often as the HX711 sample rate; >10Hz@10SPS, >80Hz@80SPS.
-   If you have other time consuming code running (i.e. a graphical LCD), consider calling update() from an interrupt routine,
-   see example file "Read_1x_load_cell_interrupt_driven.ino".
-
-   This is an example sketch on how to use this library
-*/
-
 #include <HX711_ADC.h>
 #if defined(ESP8266)|| defined(ESP32) || defined(AVR)
 #include <EEPROM.h>
@@ -85,21 +65,129 @@ void setup() {
 
 
   //Find the start of the sample - i.e. the zero point
+  initialise();
 
-  //First unload completely
-  delay(100);
-  float forceA = -1000;
-  while (forceA == - 1000) {
-    forceA = measure();
-    Serial.print("Force A:  ");
-    Serial.println(forceA);
+  
+}
+
+int plotCount = 0;
+bool isrunning = 1;
+
+void loop() {
+
+
+  float force;
+  force = measure();
+
+  if (force != -1000) {  //if there is a force measurement
+
+    float step;
+
+    //control
+    step = p * (targetF - force) * isrunning;
+      
+    move(step);
+    displacement += step;
+    delay(50);
+    
+      
+    //keep track of compression
+    
   }
 
-  move(-1);
+   
+
+  // receive command from serial terminal, send 't' to initiate tare operation:
+  if (Serial.available() > 0) {
+    char inByte = Serial.read();
+    if (inByte == 't') LoadCell.tareNoDelay();
+    if (inByte == 'P') targetF += 10;
+    if (inByte == 'N') targetF -= 10;
+    if (inByte == 'X') isrunning = !isrunning;
+  }
+
+  // check if last tare operation is complete:
+  if (LoadCell.getTareStatus() == true) {
+    Serial.println("Tare complete");
+  }
+
+}
+
+float measure() {
+
+  float measurement = -1000;
+
+  static boolean newDataReady = 0;
+  const int serialPrintInterval = 10; //increase value to slow down serial print activity
+
+  // check for new data/start next conversion:
+  if (LoadCell.update()) newDataReady = true;
+
+  // if the data is not ready, check again after a small delay. Only do this once
+  if (!newDataReady) {
+    delay(10);
+    if (LoadCell.update()) newDataReady = true;
+  }
+
+  // get smoothed value from the dataset:
+  if (newDataReady) {
+    float i;
+    if (millis() > t + serialPrintInterval) {
+      i = LoadCell.getData();
+      newDataReady = 0;
+      t = millis();
+    }
+
+    measurement = i;
+
+    
+    //Plot force
+    if (plotCount = 1000) {
+      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement)); // + "," + String(0) + "," + String(40)
+      plotCount = 0;
+    } else {
+      plotCount++;
+    }
+        
+  }
+
+  return measurement;
+
+  
+}
+
+
+void move(float dist) {
+  //postive values compress
+  float pitch = 1;
+  float revolutions = dist/pitch;
+  int steps = stepsPerRevolution * revolutions;
+
+  myStepper.step(-steps);
+}
+
+
+void initialise() {
+
+  //First unload completely
+
+  //get a mearuement for the start force
+  delay(100);
+  float forceA = -1000;
+  while (forceA == - 1000) { //this may cause issues if the load cell has a problem
+    forceA = measure();
+    delay(10);
+  }
+  Serial.print("Force A:  ");
+  Serial.println(forceA);
+
+  move(-1);  //uncompress by 1mm
   delay(1000);
-  float forceB = measure();
-  forceB = measure();
-  forceB = measure();
+  float forceB = -1000;
+  while (forceB == - 1000) { //this may cause issues if the load cell has a problem
+    forceB = measure();
+    delay(10);
+  }
   Serial.print("Force B:  ");
   Serial.println(forceB);
 
@@ -163,95 +251,4 @@ void setup() {
     if (LoadCell.getTareStatus() == true) { tared = 1;}
   }
   Serial.println("Tare complete");
-  
-}
-
-int plotCount = 0;
-bool isrunning = 1;
-
-void loop() {
-
-
-  float force;
-  force = measure();
-
-  if (force != -1000) {  //if there is a force measurement
-
-    float step;
-
-    //control
-    step = p * (targetF - force) * isrunning;
-      
-    move(step);
-    displacement += step;
-    delay(50);
-    
-      
-    //keep track of compression
-    
-  }
-
-   
-
-  // receive command from serial terminal, send 't' to initiate tare operation:
-  if (Serial.available() > 0) {
-    char inByte = Serial.read();
-    if (inByte == 't') LoadCell.tareNoDelay();
-    if (inByte == 'P') targetF += 10;
-    if (inByte == 'N') targetF -= 10;
-    if (inByte == 'X') isrunning = !isrunning;
-  }
-
-  // check if last tare operation is complete:
-  if (LoadCell.getTareStatus() == true) {
-    Serial.println("Tare complete");
-  }
-
-}
-
-float measure() {
-
-  float measurement = -1000;
-
-  static boolean newDataReady = 0;
-  const int serialPrintInterval = 10; //increase value to slow down serial print activity
-
-  // check for new data/start next conversion:
-  if (LoadCell.update()) newDataReady = true;
-
-  // get smoothed value from the dataset:
-  if (newDataReady) {
-    float i;
-    if (millis() > t + serialPrintInterval) {
-      i = LoadCell.getData();
-      newDataReady = 0;
-      t = millis();
-    }
-
-    measurement = i;
-
-    
-    //Plot force
-    if (plotCount = 1000) {
-      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement)); // + "," + String(0) + "," + String(40)
-      plotCount = 0;
-    } else {
-      plotCount++;
-    }
-        
-  }
-
-  return measurement;
-
-  
-}
-
-
-void move(float dist) {
-  //postive values compress
-  float pitch = 1;
-  float revolutions = dist/pitch;
-  int steps = stepsPerRevolution * revolutions;
-
-  myStepper.step(-steps);
 }
