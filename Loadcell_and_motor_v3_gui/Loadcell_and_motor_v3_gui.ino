@@ -31,7 +31,9 @@ float targetF = 20;   //target force
 
 float displacement = 0; //
 
+
 void setup() {
+
 
   
   Serial.begin(57600); delay(10);
@@ -64,9 +66,9 @@ void setup() {
   }
 
 
-  Serial.println("Status: Initialising")
+  Serial.println("Status: Initialising");
   //Find the start of the sample - i.e. the zero point
-  initialise();
+  //initialise();
 
   
 }
@@ -74,7 +76,13 @@ void setup() {
 int plotCount = 0;
 bool isrunning = 1;
 
+
+bool isReading = 0;
+String incoming; //used for incoming messages - might be bad to use string??
+
 void loop() {
+
+
 
 
   float force;
@@ -101,15 +109,22 @@ void loop() {
   // receive command from serial terminal, send 't' to initiate tare operation:
   if (Serial.available() > 0) {
     char inByte = Serial.read();
-    if (inByte == 't') LoadCell.tareNoDelay();
-    if (inByte == 'P') targetF += 10;
-    if (inByte == 'N') targetF -= 10;
-    if (inByte == 'X') isrunning = !isrunning;
+    if (inByte == '~') { //stop reading
+      isReading = 0;
+      if (incoming.substring(0, 2) = "FFF") {
+        targetF = incoming.substring(3, incoming.length()).toFloat();
+      }
+    } else if (inByte == '#') { //start reading
+      isReading = 1;
+      incoming = "";
+    } else if (isReading) { //read
+      incoming.concat(inByte);
+    }
   }
 
   // check if last tare operation is complete:
   if (LoadCell.getTareStatus() == true) {
-    Serial.println("Tare complete");
+    Serial.println("debug: Tare complete");
   }
 
 }
@@ -144,7 +159,14 @@ float measure() {
     
     //Plot force
     if (plotCount = 1000) {
-      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement)); // + "," + String(0) + "," + String(40)
+      Serial.print(String("Force: "));
+      Serial.println(i);
+      Serial.print(String("Displacement: "));
+      Serial.println(displacement);
+      Serial.print(String("Target Force: "));
+      Serial.println(targetF);
+      Serial.print(String("Target Displacement: "));
+      Serial.println("NONE");
       plotCount = 0;
     } else {
       plotCount++;
