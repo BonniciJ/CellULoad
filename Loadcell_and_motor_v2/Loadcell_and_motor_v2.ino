@@ -18,6 +18,9 @@
    This is an example sketch on how to use this library
 */
 
+/* Checking git working 
+ */
+
 #include <HX711_ADC.h>
 #if defined(ESP8266)|| defined(ESP32) || defined(AVR)
 #include <EEPROM.h>
