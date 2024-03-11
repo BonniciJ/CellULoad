@@ -91,8 +91,6 @@ void setup() {
   float forceA = -1000;
   while (forceA == - 1000) {
     forceA = measure();
-    Serial.print("Force A:  ");
-    Serial.println(forceA);
   }
 
   move(-1);
@@ -129,10 +127,8 @@ void setup() {
   //Next screw in unitl zero point (until small increase in load
   delay(100);
   forceA = -1000;
-  while (forceA == - 1000) {
+  while (forceA == -1000) {
     forceA = measure();
-    Serial.print("Force A:  ");
-    Serial.println(forceA);
   }
 
   move(0.5);
@@ -140,8 +136,8 @@ void setup() {
   Serial.print("Force B:  ");
   Serial.println(forceB);
 
-  while (abs(forceA - forceB) < 1) {
-    delay(100);
+  while (abs(forceA - forceB) < 0.5) {
+    delay(10);
     move(0.1);
     forceB = measure();
     Serial.print("Force A:  ");
@@ -170,6 +166,7 @@ int plotCount = 0;
 bool isrunning = 1;
 
 float movementRemaining = 0;
+float prevMovementRemaining = 0;
 float timePermm = 20; //in mins
 
 void loop() {
@@ -180,14 +177,14 @@ void loop() {
 
   if (force != -1000) {  //if there is a force measurement
 
-    if (movementRemaining = 0){
+    if ((movementRemaining <= 0 && prevMovementRemaining > 0) || (movementRemaining >= 0 && prevMovementRemaining < 0)){
 
       float step;
       float error = targetF - force;
-      Serial.println("POINT A")
       step = control(error) * isrunning;
 
       movementRemaining = step;
+      prevMovementRemaining = step;
 
     } else {
 
@@ -195,6 +192,7 @@ void loop() {
 
       move(stepSize);
       displacement += stepSize;
+      prevMovementRemaining = movementRemaining
       movementRemaining -= stepSize;
 
       delay(((1/timePermm)/60)/stepSize);
@@ -226,7 +224,7 @@ float prevError = 0;
 
 float control(float error){
 
-  Serial.println("POINT B")
+  Serial.println("POINT B");
 
   float step = 0;
 
