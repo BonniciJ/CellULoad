@@ -1,3 +1,23 @@
+/*
+   -------------------------------------------------------------------------------------
+   HX711_ADC
+   Arduino library for HX711 24-Bit Analog-to-Digital Converter for Weight Scales
+   Olav Kallhovd sept2017
+   -------------------------------------------------------------------------------------
+*/
+
+/*
+   Settling time (number of samples) and data filtering can be adjusted in the config.h file
+   For calibration and storing the calibration value in eeprom, see example file "Calibration.ino"
+
+   The update() function checks for new data and starts the next conversion. In order to acheive maximum effective
+   sample rate, update() should be called at least as often as the HX711 sample rate; >10Hz@10SPS, >80Hz@80SPS.
+   If you have other time consuming code running (i.e. a graphical LCD), consider calling update() from an interrupt routine,
+   see example file "Read_1x_load_cell_interrupt_driven.ino".
+
+   This is an example sketch on how to use this library
+*/
+
 #include <HX711_ADC.h>
 #if defined(ESP8266)|| defined(ESP32) || defined(AVR)
 #include <EEPROM.h>
@@ -64,15 +84,93 @@ void setup() {
   }
 
 
-  Serial.println("Status: Initialising")
   //Find the start of the sample - i.e. the zero point
-  initialise();
 
+  //First unload completely
+  delay(100);
+  float forceA = -1000;
+  while (forceA == - 1000) {
+    forceA = measure();
+    Serial.print("Force A:  ");
+    Serial.println(forceA);
+  }
+
+  move(-1);
+  delay(1000);
+  float forceB = measure();
+  forceB = measure();
+  forceB = measure();
+  Serial.print("Force B:  ");
+  Serial.println(forceB);
+
+  while (abs(forceA - forceB) > 0.1) {
+    delay(100);
+    forceA = measure();
+    move(-0.5);
+    forceB = measure();
+    Serial.print("Force A:  ");
+    Serial.print(forceA);
+    Serial.print("     Force B:  ");
+    Serial.println(forceB);
+  }
+  
+  Serial.println("ZERO - UNLOADED");
+  LoadCell.tareNoDelay();
+  // wait until last tare operation is complete:
+  bool tared = false;
+  while (!tared) {
+    delay(10);
+    measure();
+    
+    if (LoadCell.getTareStatus() == true) { tared = 1;}
+  }
+  Serial.println("Tare complete");
+
+  //Next screw in unitl zero point (until small increase in load
+  delay(100);
+  forceA = -1000;
+  while (forceA == - 1000) {
+    forceA = measure();
+    Serial.print("Force A:  ");
+    Serial.println(forceA);
+  }
+
+  move(0.5);
+  forceB = measure();
+  Serial.print("Force B:  ");
+  Serial.println(forceB);
+
+  while (abs(forceA - forceB) < 1) {
+    delay(100);
+    move(0.1);
+    forceB = measure();
+    Serial.print("Force A:  ");
+    Serial.print(forceA);
+    Serial.print("     Force B:  ");
+    Serial.println(forceB);
+  }
+  
+  Serial.println("ZERO DISPLACEMENT");
+  LoadCell.tareNoDelay();
+  displacement = 0;
+
+    // wait until last tare operation is complete:
+  tared = false;
+  while (!tared) {
+    delay(10);
+    measure();
+    
+    if (LoadCell.getTareStatus() == true) { tared = 1;}
+  }
+  Serial.println("Tare complete");
   
 }
 
 int plotCount = 0;
 bool isrunning = 1;
+
+float movementRemaining = 0;
+float timePermm = 20; //in mins
 
 void loop() {
 
@@ -82,17 +180,23 @@ void loop() {
 
   if (force != -1000) {  //if there is a force measurement
 
-    float step;
+    if (movementRemaining = 0){
 
-    //control
-    step = p * (targetF - force) * isrunning;
-      
-    move(step);
-    displacement += step;
-    delay(50);
-    
-      
-    //keep track of compression
+      float step = control(targetF - force) * isrunning;
+
+      movementRemaining = step;
+
+    } else {
+
+      float stepSize = 0.001;
+
+      move(stepSize);
+      displacement += stepSize;
+      movementRemaining -= stepSize;
+
+      delay(((1/timePermm)/60)/stepSize)
+
+    }
     
   }
 
@@ -114,6 +218,22 @@ void loop() {
 
 }
 
+
+float prevError = 0;
+
+float control(error){
+
+  float step = 0;
+
+  step = p * error;
+
+  prevError = error;
+
+  return step;
+
+}
+
+
 float measure() {
 
   float measurement = -1000;
@@ -123,12 +243,6 @@ float measure() {
 
   // check for new data/start next conversion:
   if (LoadCell.update()) newDataReady = true;
-
-  // if the data is not ready, check again after a small delay. Only do this once
-  if (!newDataReady) {
-    delay(10);
-    if (LoadCell.update()) newDataReady = true;
-  }
 
   // get smoothed value from the dataset:
   if (newDataReady) {
@@ -165,91 +279,4 @@ void move(float dist) {
   int steps = stepsPerRevolution * revolutions;
 
   myStepper.step(-steps);
-}
-
-
-void initialise() {
-
-  //First unload completely
-
-  //get a mearuement for the start force
-  delay(100);
-  float forceA = -1000;
-  while (forceA == - 1000) { //this may cause issues if the load cell has a problem
-    forceA = measure();
-    delay(10);
-  }
-  Serial.print("debug: Force A:  ");
-  Serial.println(forceA);
-
-  move(-1);  //uncompress by 1mm
-  delay(1000);
-  float forceB = -1000;
-  while (forceB == - 1000) { //this may cause issues if the load cell has a problem
-    forceB = measure();
-    delay(10);
-  }
-  Serial.print("debug: Force B:  ");
-  Serial.println(forceB);
-
-  while (abs(forceA - forceB) > 0.1) {
-    delay(100);
-    forceA = measure();
-    move(-0.5);
-    forceB = measure();
-    Serial.print("debug: Force A:  ");
-    Serial.print(forceA);
-    Serial.print("     Force B:  ");
-    Serial.println(forceB);
-  }
-  
-  Serial.println("Status: Finding zero displacement");
-  LoadCell.tareNoDelay();
-  // wait until last tare operation is complete:
-  bool tared = false;
-  while (!tared) {
-    delay(10);
-    measure();
-    
-    if (LoadCell.getTareStatus() == true) { tared = 1;}
-  }
-  Serial.println("debug: Tare complete");
-
-  //Next screw in unitl zero point (until small increase in load
-  delay(100);
-  forceA = -1000;
-  while (forceA == - 1000) {
-    forceA = measure();
-    Serial.print("debug: Force A:  ");
-    Serial.println(forceA);
-  }
-
-  move(0.5);
-  forceB = measure();
-  Serial.print("debug: Force B:  ");
-  Serial.println(forceB);
-
-  while (abs(forceA - forceB) < 1) {
-    delay(100);
-    move(0.1);
-    forceB = measure();
-    Serial.print("debug: Force A:  ");
-    Serial.print(forceA);
-    Serial.print("     Force B:  ");
-    Serial.println(forceB);
-  }
-  
-  Serial.println("Status: Fully Zeroed");
-  LoadCell.tareNoDelay();
-  displacement = 0;
-
-    // wait until last tare operation is complete:
-  tared = false;
-  while (!tared) {
-    delay(10);
-    measure();
-    
-    if (LoadCell.getTareStatus() == true) { tared = 1;}
-  }
-  Serial.println("debug: Tare complete");
 }
