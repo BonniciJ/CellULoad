@@ -166,8 +166,8 @@ int plotCount = 0;
 bool isrunning = 1;
 
 float movementRemaining = 0;
-float prevMovementRemaining = 0;
 float timePermm = 20; //in mins
+bool direction = 0; //0 for positive and 1 for negative
 
 void loop() {
 
@@ -177,22 +177,23 @@ void loop() {
 
   if (force != -1000) {  //if there is a force measurement
 
-    if ((movementRemaining <= 0 && prevMovementRemaining > 0) || (movementRemaining >= 0 && prevMovementRemaining < 0)){
+    if (direction * (movementRemaining <= 0)){
 
       float step;
       float error = targetF - force;
       step = control(error) * isrunning;
 
       movementRemaining = step;
-      prevMovementRemaining = step;
+      if (movementRemaining > 0) {direction = 1;} else {direction = 0;}
 
     } else {
 
-      float stepSize = 0.001;
+      float stepSize;
+
+      if (movementRemaining > 0) {stepSize = 0.001;} else {stepSize = -0.001;}
 
       move(stepSize);
       displacement += stepSize;
-      prevMovementRemaining = movementRemaining
       movementRemaining -= stepSize;
 
       delay(((1/timePermm)/60)/stepSize);
