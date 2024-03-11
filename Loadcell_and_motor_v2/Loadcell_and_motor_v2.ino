@@ -182,7 +182,10 @@ void loop() {
 
     if (movementRemaining = 0){
 
-      float step = control(targetF - force) * isrunning;
+      float step;
+      float error = targetF - force;
+      Serial.println("POINT A")
+      step = control(error) * isrunning;
 
       movementRemaining = step;
 
@@ -194,7 +197,7 @@ void loop() {
       displacement += stepSize;
       movementRemaining -= stepSize;
 
-      delay(((1/timePermm)/60)/stepSize)
+      delay(((1/timePermm)/60)/stepSize);
 
     }
     
@@ -221,13 +224,18 @@ void loop() {
 
 float prevError = 0;
 
-float control(error){
+float control(float error){
+
+  Serial.println("POINT B")
 
   float step = 0;
 
   step = p * error;
 
   prevError = error;
+
+  Serial.print("error: ");
+  Serial.println(error);
 
   return step;
 
@@ -257,7 +265,7 @@ float measure() {
 
     
     //Plot force
-    if (plotCount = 1000) {
+    if (plotCount = 1000 && i != -1000) {
       Serial.println(String(i) + "," + String(targetF) + "," + String(displacement)); // + "," + String(0) + "," + String(40)
       plotCount = 0;
     } else {
