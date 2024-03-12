@@ -168,9 +168,9 @@ void setup() {
 int plotCount = 0;
 bool isrunning = 1;
 
-float movementRemaining = 0;
 float timePermm = 20; //in mins
-bool direction = 0; //0 for positive and 1 for negative
+float movementRemaining = 0;
+bool direction = 1; 
 
 void loop() {
 
@@ -180,28 +180,27 @@ void loop() {
 
   if (force != -1000) {  //if there is a force measurement
 
-    if (direction * (movementRemaining <= 0)){
+    if (movementRemaining <= 0){
 
       float step;
       float error = targetF - force;
       step = control(error) * isrunning;
 
-      movementRemaining = step;
-      if (movementRemaining > 0) {direction = 1;} else {direction = 0;}
+      movementRemaining = abs(step);
+      if (step > 0) {direction = 1;} else {direction = -1;}
 
     } else {
 
-      float stepSize;
-
-      if (movementRemaining > 0) {stepSize = 0.001;} else {stepSize = -0.001;}
+      float stepSize = 0.001 * direction;
 
       move(stepSize);
       displacement += stepSize;
-      movementRemaining -= stepSize;
-
-      delay(((1/timePermm)/60)/stepSize);
+      movementRemaining -= abs(stepSize);
 
     }
+
+    //delay to ensure slow compression at specified rate 
+    delay(((1/timePermm)/60)/stepSize);  //should really take away the time for the move function to complete
     
   }
 
