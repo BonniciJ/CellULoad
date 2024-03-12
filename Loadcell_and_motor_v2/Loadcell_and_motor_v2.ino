@@ -1,22 +1,4 @@
-/*
-   -------------------------------------------------------------------------------------
-   HX711_ADC
-   Arduino library for HX711 24-Bit Analog-to-Digital Converter for Weight Scales
-   Olav Kallhovd sept2017
-   -------------------------------------------------------------------------------------
-*/
-
-/*
-   Settling time (number of samples) and data filtering can be adjusted in the config.h file
-   For calibration and storing the calibration value in eeprom, see example file "Calibration.ino"
-
-   The update() function checks for new data and starts the next conversion. In order to acheive maximum effective
-   sample rate, update() should be called at least as often as the HX711 sample rate; >10Hz@10SPS, >80Hz@80SPS.
-   If you have other time consuming code running (i.e. a graphical LCD), consider calling update() from an interrupt routine,
-   see example file "Read_1x_load_cell_interrupt_driven.ino".
-
-   This is an example sketch on how to use this library
-*/
+// A
 
 #include <HX711_ADC.h>
 #if defined(ESP8266)|| defined(ESP32) || defined(AVR)
@@ -102,7 +84,7 @@ void loop() {
 
   if (force != -1000) {  //if there is a force measurement
 
-    if (movementRemaining <= 0){
+    if (movementRemaining < 0){
 
       float step;
       float error = targetF - force;
@@ -114,6 +96,8 @@ void loop() {
       } else {
         direction = -1;
       }
+
+      Serial.println(movementRemaining);
 
     } else {
 
@@ -208,14 +192,12 @@ void move(float dist) {
 
 void initialise() {
   //Find the start of the sample - i.e. the zero point
-
   //First unload completely
   delay(100);
   float forceA = -1000;
   while (forceA == - 1000) {
     forceA = measure();
   }
-
   move(-1);
   delay(1000);
   float forceB = measure();
@@ -223,7 +205,6 @@ void initialise() {
   forceB = measure();
   Serial.print("Force B:  ");
   Serial.println(forceB);
-
   while (abs(forceA - forceB) > 0.1) {
     delay(100);
     forceA = measure();
@@ -246,24 +227,20 @@ void initialise() {
     if (LoadCell.getTareStatus() == true) { tared = 1;}
   }
   Serial.println("Tare complete");
-
   //Next screw in unitl zero point (until small increase in load
   delay(100);
   forceA = -1000;
-  forceA = measure();
-
+  while (forceA == -1000) {
+    forceA = measure();
+  }
   move(0.5);
   forceB = measure();
   Serial.print("Force B:  ");
   Serial.println(forceB);
-
   while (abs(forceA - forceB) < 0.5) {
     delay(10);
     move(0.1);
-    while (forceB == -1000) {
-      forceB = measure();
-      delay(10);
-    };
+    forceB = measure();
     Serial.print("Force A:  ");
     Serial.print(forceA);
     Serial.print("     Force B:  ");
@@ -273,7 +250,6 @@ void initialise() {
   Serial.println("ZERO DISPLACEMENT");
   LoadCell.tareNoDelay();
   displacement = 0;
-
     // wait until last tare operation is complete:
   tared = false;
   while (!tared) {
