@@ -83,7 +83,7 @@ void setup() {
     //Serial.println("Startup is complete");
   }
 
-  initialise();
+  //initialise();
   
 }
 
@@ -168,18 +168,13 @@ float control(float error){
 
 
 float measure() {
-
   float measurement = -1000;
-
   static boolean newDataReady = 0;
   const int serialPrintInterval = 10; //increase value to slow down serial print activity
-
   // check for new data/start next conversion:
   if (LoadCell.update()) newDataReady = true;
-
   // get smoothed value from the dataset:
   if (newDataReady) {
-  
     float i;
     if (millis() > t + serialPrintInterval) {
       i = LoadCell.getData();
@@ -187,10 +182,9 @@ float measure() {
       t = millis();
     }
     measurement = i;
-
     
     //Plot force
-    if (plotCount = 5000 && i != -1000) {
+    if (plotCount = 1000 && i != -1000) {
       Serial.println(String(i) + "," + String(targetF) + "," + String(displacement)); // + "," + String(0) + "," + String(40)
       plotCount = 0;
     } else {
@@ -198,9 +192,7 @@ float measure() {
     }
         
   }
-
   return measurement;
-
   
 }
 
