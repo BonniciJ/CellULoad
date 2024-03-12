@@ -127,7 +127,9 @@ void loop() {
       movementRemaining -= abs(stepSize);
 
       //delay to ensure slow compression at specified rate 
-      delay(timePermm*60000*stepSize);  //should really take away the time for the move function to complete
+      int timeDelay = timePermm*60000*stepSize; //time to do one step
+      timeDelay -= stepSize * 7.5 * 1000;    //correct for the time it takes to turn the motor
+      delay(timeDelay);  
     }
 
     
@@ -173,6 +175,7 @@ float measure() {
   float measurement = -1000;
 
   static boolean newDataReady = 0;
+  const int serialPrintInterval = 10; //increase value to slow down serial print activity
 
   // check for new data/start next conversion:
   if (LoadCell.update()) newDataReady = true;
@@ -180,7 +183,12 @@ float measure() {
   // get smoothed value from the dataset:
   if (newDataReady) {
   
-    float i = LoadCell.getData();
+    float i;
+    if (millis() > t + serialPrintInterval) {
+      i = LoadCell.getData();
+      newDataReady = 0;
+      t = millis();
+    }
     measurement = i;
 
     
