@@ -2,6 +2,8 @@ import tkinter as tk
 import serial
 import time
 import threading
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 
@@ -22,24 +24,42 @@ def set_displacement():
 
 
 def arduino_reader():
+    #The data to plot
+    forceData = [0] * 51
+    targetForceData = [0] * 51
+    dispData = [0] * 51
+
     while 1:
         
         data = (arduino.readline().strip()).decode("utf-8")
         print(data)
         if data.startswith("Force:"):
-            forceReading = data.split(":")[1]
+            splitData = data.split(":")
+            index = splitData[1]
+            forceReading = splitData[2]
             current_force_var.set(forceReading)
+
+            #update the plot
+            forceData[int(index)] = forceReading
+
+            plot.clear()
+            plot.plot(forceData)
+            plot.plot(forceData)
+            canvas.draw()
+            
+
+
         elif data.startswith("Displacement:"):
-            dispReading = data.split(":")[1]
+            dispReading = data.split(":")[2]
             current_displacement_var.set(dispReading)
         elif data.startswith("Status:"):
             statusReading = data.split(":")[1]
             status_var.set(statusReading)
         elif data.startswith("Target Force:"):
-            forceReading = data.split(":")[1]
+            forceReading = data.split(":")[2]
             target_force_var.set(forceReading)
         elif data.startswith("Target Displacement:"):
-            dispReading = data.split(":")[1]
+            dispReading = data.split(":")[2]
             target_displacement_var.set(dispReading)
             
 
@@ -50,6 +70,9 @@ def arduino_reader():
 
 def arduino_writier(x):
     arduino.write(bytes(x, 'utf-8'))
+
+
+
     
 
 # Create the main window
@@ -63,11 +86,12 @@ root.rowconfigure(6, weight=1)
 
 
 # Create StringVars for 
-status_var = tk.StringVar(value="OFF")
+status_var = tk.StringVar(value="NOT CONNECTED")
 target_force_var = tk.StringVar(value="")
 current_force_var = tk.StringVar(value="")
 target_displacement_var = tk.StringVar(value="")
 current_displacement_var = tk.StringVar(value="")
+
 
 
 # Create and place the labels and buttons
@@ -93,9 +117,18 @@ displacement_entry = tk.Entry(root)
 displacement_entry.grid(column=3, row=3, sticky="ew", padx=5, pady=5)
 tk.Button(root, text="BUTTON", command=set_displacement).grid(column=4, row=3, padx=5, pady=5)
 
-# Image area - eventually where the plot will go
-image_area = tk.Label(root, text="Large area for image", bg="lightblue", relief="sunken")
-image_area.grid(column=0, row=6, columnspan=5, sticky="nsew", padx=5, pady=5)
+
+# Create a figure for the plot
+fig = Figure(figsize=(5, 4), dpi=100)
+plot = fig.add_subplot(1, 1, 1)
+
+# Create the canvas and add it to the window
+canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
+canvas.draw()
+canvas.get_tk_widget().grid(column=0, row=6, columnspan=5, sticky="nsew", padx=5, pady=5)
+
+
+
 
 #start serial communication 
 arduino = serial.Serial('com6', 57600) 
