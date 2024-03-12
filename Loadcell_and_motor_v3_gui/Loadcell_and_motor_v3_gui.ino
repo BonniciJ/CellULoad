@@ -80,10 +80,9 @@ bool isrunning = 1;
 bool isReading = 0;
 String incoming; //used for incoming messages - might be bad to use string??
 
+int sendCount = 0;
+
 void loop() {
-
-
-
 
   float force;
   force = measure();
@@ -99,14 +98,12 @@ void loop() {
     displacement += step;
     delay(50);
     
-      
-    //keep track of compression
     
   }
 
    
 
-  // receive command from serial terminal, send 't' to initiate tare operation:
+  // receive command from serial 
   if (Serial.available() > 0) {
     char inByte = Serial.read();
     if (inByte == '~') { //stop reading
@@ -126,6 +123,8 @@ void loop() {
   if (LoadCell.getTareStatus() == true) {
     Serial.println("debug: Tare complete");
   }
+
+  if (sendCount < 50){sendCount++;} else {sendCount=0;}
 
 }
 
@@ -159,13 +158,24 @@ float measure() {
     
     //Plot force
     if (plotCount = 1000) {
-      Serial.print(String("Force: "));
+      Serial.print(String("Force:"));
+      Serial.print(String(sendCount));
+      Serial.print(String(":"));
       Serial.println(i);
-      Serial.print(String("Displacement: "));
+
+      Serial.print(String("Displacement:"));
+      Serial.print(String(sendCount));
+      Serial.print(String(":"));
       Serial.println(displacement);
-      Serial.print(String("Target Force: "));
+
+      Serial.print(String("Target Force:"));
+      Serial.print(String(sendCount));
+      Serial.print(String(":"));
       Serial.println(targetF);
-      Serial.print(String("Target Displacement: "));
+
+      Serial.print(String("Target Displacement:"));
+      Serial.print(String(sendCount));
+      Serial.print(String(":"));
       Serial.println("NONE");
       plotCount = 0;
     } else {
