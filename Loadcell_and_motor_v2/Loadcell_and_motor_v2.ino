@@ -79,8 +79,8 @@ int direction = 1;
 void loop() {
 
 
-  float force;
-  force = measure();
+  float force = 0;
+  //force = measure();
 
   if (force != -1000) {  //if there is a force measurement
 
@@ -141,11 +141,8 @@ float prevError = 0;
 float control(float error){
 
   float step = 0;
-
   step = p * error;
-
   prevError = error;
-
   return step;
 
 }

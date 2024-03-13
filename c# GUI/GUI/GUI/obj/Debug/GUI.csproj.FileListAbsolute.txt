@@ -1,0 +1,10 @@
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\bin\Debug\GUI.exe.config
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\bin\Debug\GUI.exe
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\bin\Debug\GUI.pdb
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\obj\Debug\GUI.csproj.AssemblyReference.cache
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\obj\Debug\GUI.Form1.resources
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\obj\Debug\GUI.Properties.Resources.resources
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\obj\Debug\GUI.csproj.GenerateResource.cache
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\obj\Debug\GUI.csproj.CoreCompileInputs.cache
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\obj\Debug\GUI.exe
+C:\Users\johnn\OneDrive - Imperial College London\Year 3\Group project\Code\Git\CellULoad\c# GUI\GUI\GUI\obj\Debug\GUI.pdb
