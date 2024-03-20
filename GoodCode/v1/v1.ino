@@ -23,26 +23,25 @@ const float p = 0.001;
 const float i;
 const float d;
 
-float targetF = 0;   //target force
-
+float targetF = 10;   //target force
 float displacement = 0; //
 
 void setup() {
 
-  
+
   Serial.begin(57600); delay(10);
 
 
   // set the speed at 5 rpm:
   myStepper.setSpeed(5);
-  
+
   //Set up the load cell
-  
+
   LoadCell.begin();
   //LoadCell.setReverseOutput(); //uncomment to turn a negative output value to positive
   float calibrationValue; // calibration value (see example file "Calibration.ino")
   calibrationValue = -43311.62; // uncomment this if you want to set the calibration value in the sketch
-  
+
   unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
   boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
   LoadCell.start(stabilizingtime, _tare);
@@ -56,36 +55,81 @@ void setup() {
   }
 
   initialise();
-  
-  
+
+
 }
 
 int plotCount = 0;
 bool isrunning = 1;
 
+float timePermm = 2; //in mins
+float movementRemaining = 0;
+int direction = 1; 
+bool decomp = 0;
+
 void loop() {
+
+  if (displacement > 2.5 && !decomp) {
+    isrunning = 0;
+  }
 
 
   float force;
   force = measure();
 
-  if (force != -1000) {  //if there is a force measurement
+    if (force != -1000) {  //if there is a force measurement
 
-    float step;
+    if (decomp && isrunning) {
 
-    //control
-    step = p * (targetF - force) * isrunning;
+      delay(50);
+      float step;
+      float error = targetF - force;
+      step = control(error) * isrunning; 
+      move(step);      
+      displacement += step;
       
-    move(step);
-    displacement += step;
-    delay(50);
+    } else if (isrunning) {
+      if (movementRemaining < 0){
+  
+        float step;
+        float error = targetF - force;
+        step = control(error) * isrunning;  
+  
+  
+        movementRemaining = abs(step);
+        if (step >= 0) {
+          direction = 1;
+          movementRemaining = step;
+        } else {
+          direction = -1;
+          movementRemaining = -step;
+        }
+  
+  
+  
+      } else if(movementRemaining = 0) {
+        delay(10);
+        
+      } else {    
+  
+        float stepSize = 0.001;
+  
+        move(stepSize * direction);
+        displacement += stepSize * direction;
+        movementRemaining -= direction * stepSize;
+  
+        //delay to ensure slow compression at specified rate 
+        int timeDelay = timePermm*60000*stepSize; //time to do one step
+        timeDelay -= stepSize * 7.5 * 1000;    //correct for the time it takes to turn the motor
+        delay(timeDelay);  
+      }
+    }
+
     
-      
-    //keep track of compression
     
   }
 
-   
+
 
   // receive command from serial terminal, send 't' to initiate tare operation:
   if (Serial.available() > 0) {
@@ -94,6 +138,8 @@ void loop() {
     if (inByte == 'P') targetF += 10;
     if (inByte == 'N') targetF -= 10;
     if (inByte == 'X') isrunning = !isrunning;
+    if (inByte == 'D') decomp = 1;
+    if (inByte == 'C') decomp = 0;
   }
 
   // check if last tare operation is complete:
@@ -102,6 +148,18 @@ void loop() {
   }
 
 }
+
+float prevError = 0;
+
+float control(float error){
+
+  float step = 0;
+  step = p * error;
+  prevError = error;
+  return step;
+
+}
+
 
 float measure() {
 
@@ -116,35 +174,33 @@ float measure() {
   // get smoothed value from the dataset:
   if (newDataReady) {
     float i;
-    if (millis() > t + serialPrintInterval) {
-      i = LoadCell.getData();
-      newDataReady = 0;
-      t = millis();
-    }
+    
+    i = LoadCell.getData();
+    newDataReady = 0;
 
     measurement = i;
 
-    
+
     //Plot force
-    if (plotCount = 1000) {
-      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement)); // + "," + String(0) + "," + String(40)
+    if (plotCount = 1000 && i != -1000) {
+      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement * 10)); // + "," + String(0) + "," + String(40)
       plotCount = 0;
     } else {
       plotCount++;
     }
-        
+
   }
 
   return measurement;
 
-  
+
 }
 
 
 void move(float dist) {
   //postive values compress
   float pitch = 1;
-  float revolutions = dist/pitch;
+  float revolutions = dist / pitch;
   int steps = stepsPerRevolution * revolutions;
 
   myStepper.step(-steps);
@@ -168,8 +224,8 @@ void initialise() {
   float forceB = measure();
   forceB = measure();
   forceB = measure();
-  Serial.print("Force B:  ");
-  Serial.println(forceB);
+  //Serial.print("Force B:  ");
+  //Serial.println(forceB);
 
   while (abs(forceA - forceB) > 0.1) {
     delay(100);
@@ -181,7 +237,7 @@ void initialise() {
     Serial.print("     Force B:  ");
     Serial.println(forceB);
   }
-  
+
   Serial.println("ZERO - UNLOADED");
   LoadCell.tareNoDelay();
   // wait until last tare operation is complete:
@@ -189,8 +245,10 @@ void initialise() {
   while (!tared) {
     delay(10);
     measure();
-    
-    if (LoadCell.getTareStatus() == true) { tared = 1;}
+
+    if (LoadCell.getTareStatus() == true) {
+      tared = 1;
+    }
   }
   Serial.println("Tare complete");
 
@@ -217,19 +275,21 @@ void initialise() {
     Serial.print("     Force B:  ");
     Serial.println(forceB);
   }
-  
+
   Serial.println("ZERO DISPLACEMENT");
   LoadCell.tareNoDelay();
   displacement = 0;
 
-    // wait until last tare operation is complete:
+  // wait until last tare operation is complete:
   tared = false;
   while (!tared) {
     delay(10);
     measure();
-    
-    if (LoadCell.getTareStatus() == true) { tared = 1;}
+
+    if (LoadCell.getTareStatus() == true) {
+      tared = 1;
+    }
   }
-  Serial.println("Tare complete");  
+  Serial.println("Tare complete");
 
 }
