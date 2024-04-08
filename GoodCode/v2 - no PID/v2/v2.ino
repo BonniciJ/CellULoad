@@ -18,11 +18,6 @@ HX711_ADC LoadCell(HX711_dout, HX711_sck);
 unsigned long t = 0;
 
 
-// PID
-const float p = 0.001;
-const float i;
-const float d;
-
 float targetF = 10;   //target force
 float displacement = 0; //current displacement
 
@@ -99,11 +94,11 @@ void loop() {
           //decompressing - this part is rough, needs improvement
 
           delay(50);
-          float step;
-          float error = targetF - force;
-          step = control(error); 
-          move(step);      
-          displacement += step;
+          // float step;
+          // float error = targetF - force;
+          // step = control(error); 
+          // move(step);      
+          // displacement += step;
         } else {
           //compressing
           doCompression(force);
@@ -122,37 +117,23 @@ void loop() {
 }
 
 void doCompression(float force) {
-  if (movementRemaining < 0){
+  float padding = 0.1; //how close is close enough force. allows the motor to jitter back and forth less
+  float stepSize = 0.001;
+  if ((targetF - force) > padding) {
+    // we need to compress
+    move(stepSize);
 
-    float step;
-    float error = targetF - force;
-    step = control(error);  
+  } else if ((targetF - force) < -padding) {
+    // we need to DEcompress
+    move(-stepSize);
 
-
-    if (step >= 0) {
-      direction = 1;
-      movementRemaining = step;
-    } else {
-      direction = -1;
-      movementRemaining = -step;
-    }
-  
-  } else if(movementRemaining = 0) {
-    delay(10);
-  } else {    
-  
-    float stepSize = 0.001;
-
-    move(stepSize * direction);
-    displacement += stepSize * direction;
-    movementRemaining -= direction * stepSize;
-
-    //delay to ensure slow compression at specified rate 
-    int timeDelay = timePermm*60000*stepSize; //time to do one step
-    timeDelay -= stepSize * 7.5 * 1000;    //correct for the time it takes to turn the motor
-    delay(timeDelay);  
   }
-  
+
+  //delay to ensure slow compression at specified rate 
+  int timeDelay = timePermm*60000*stepSize; //time to do one step
+  timeDelay -= stepSize * 7.5 * 1000;    //correct for the time it takes to turn the motor
+  delay(timeDelay);  
+
 }
 
 
@@ -169,14 +150,6 @@ void listenToSerial(){
   }
 }
 
-float control(float error){
-
-  float step = 0;
-  step = p * error;
-  prevError = error;
-  return step;
-
-}
 
 
 float measure() {
@@ -201,7 +174,7 @@ float measure() {
 
     //Plot force
     if (plotCount = 1000 && i != -1000) {
-      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement * 10));
+      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement));
       plotCount = 0;
     } else {
       plotCount++;
@@ -220,6 +193,8 @@ void move(float dist) {
   float pitch = 1;
   float revolutions = dist / pitch;
   int steps = stepsPerRevolution * revolutions;
+
+  displacement += steps * (pitch / stepsPerRevolution);
 
   myStepper.step(-steps);
 }

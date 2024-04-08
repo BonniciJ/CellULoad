@@ -2,6 +2,8 @@
 #include <Stepper.h>
 
 
+void(* resetFunc) (void) = 0;
+
 
 // initialize the stepper library on pins 8 through 11:
 const int stepsPerRevolution = 2048;  // resolution of motor
@@ -17,11 +19,6 @@ HX711_ADC LoadCell(HX711_dout, HX711_sck);
 
 unsigned long t = 0;
 
-
-// PID
-const float p = 0.001;
-const float i;
-const float d;
 
 float targetF = 10;   //target force
 float displacement = 0; //current displacement
@@ -54,7 +51,7 @@ void setup() {
     //Serial.println("Startup is complete");
   }
 
-  //initialise();
+  initialise();
 
 
 }
@@ -68,14 +65,16 @@ bool decomp = 0;
 float maxCompression = 2.5; //measured in mm. Maximum compression 
 
 
-bool halted = 0;
+bool halted = 1;
 bool atMaxCompress = 0;
 
 
 void loop() {
+  
 
   if (halted) {
     delay(50);
+    float force = measure();
   } else {
 
     if (displacement >= maxCompression && !decomp) {
@@ -88,6 +87,7 @@ void loop() {
       if (displacement < maxCompression | decomp) {
         atMaxCompress = 0;
       }
+      float force = measure();
     } else {
       //if we arent at max compression and we arent halted:
       
@@ -101,9 +101,8 @@ void loop() {
           delay(50);
           float step;
           float error = targetF - force;
-          step = control(error); 
-          move(step);      
-          displacement += step;
+          step = 0.001 * (error); 
+          float trueStep = move(step);      
         } else {
           //compressing
           doCompression(force);
@@ -122,61 +121,75 @@ void loop() {
 }
 
 void doCompression(float force) {
-  if (movementRemaining < 0){
+  float padding = 0.1; //how close is close enough force. allows the motor to jitter back and forth less
+  float stepSize = 0.001;
+  float trueStep;
+  if ((targetF - force) > padding) {
+    // we need to compress
+    trueStep = move(stepSize);
 
-    float step;
-    float error = targetF - force;
-    step = control(error);  
+  } else if ((targetF - force) < -padding) {
+    // we need to DEcompress
+    trueStep = move(-stepSize);
 
-
-    if (step >= 0) {
-      direction = 1;
-      movementRemaining = step;
-    } else {
-      direction = -1;
-      movementRemaining = -step;
-    }
-  
-  } else if(movementRemaining = 0) {
-    delay(10);
-  } else {    
-  
-    float stepSize = 0.001;
-
-    move(stepSize * direction);
-    displacement += stepSize * direction;
-    movementRemaining -= direction * stepSize;
-
-    //delay to ensure slow compression at specified rate 
-    int timeDelay = timePermm*60000*stepSize; //time to do one step
-    timeDelay -= stepSize * 7.5 * 1000;    //correct for the time it takes to turn the motor
-    delay(timeDelay);  
   }
-  
+
+  //delay to ensure slow compression at specified rate 
+  int timeDelay = timePermm*60000*trueStep; //time to do one step
+  timeDelay -= trueStep * 7.5 * 1000;    //correct for the time it takes to turn the motor
+  delay(timeDelay);  
+
 }
 
 
 float prevError = 0;
+String incoming; //used for incoming messages - might be bad to use string??
+bool isReading = 0;
 
 void listenToSerial(){
+
+
   if (Serial.available() > 0) {
     char inByte = Serial.read();
-    if (inByte == 'P') targetF += 10;           //increase target force
-    if (inByte == 'N') targetF -= 10;           //decrease target force
-    if (inByte == 'X') halted = !halted;  //toggle compression
-    if (inByte == 'D') decomp = 1;              //decompress
-    if (inByte == 'C') decomp = 0;              //compress
+
+
+    if (inByte == 'H') halted = true;  
+    if (inByte == 'X') halted = false;  
+    if (inByte == 'Y') decomp = true; 
+    if (inByte == 'K') decomp = false; 
+    if (inByte == '_') resetFunc();              //compress
+
+    if (inByte == '~') { //stop reading
+      isReading = 0;
+      
+      // used for setting new force and deformation limits, and the rate
+      if (incoming.substring(0, 3) == "FOR") {
+        targetF = incoming.substring(3, incoming.length()).toFloat();
+      }
+      if (incoming.substring(0, 3) == "DEF") {
+        maxCompression = incoming.substring(3, incoming.length()).toFloat();
+      }
+      if (incoming.substring(0, 3) == "RAT") {
+        timePermm = incoming.substring(3, incoming.length()).toFloat();
+      }
+
+      // //used to change mode 
+      // if (incoming.substring(0, 6) == "DECOMP") { //decompression mode (i.e. fast rate)
+      //   decomp = 1;
+      // }
+      // if (incoming.substring(0, 4) == "COMP") { //compression mode (i.e. constant, low rate)
+      //   decomp = 0;
+      // }
+
+    } else if (inByte == '#') { //start reading
+      isReading = 1;
+      incoming = "";
+    } else if (isReading) { //read
+      incoming.concat(inByte);
+    }
   }
 }
 
-float control(float error){
-
-  float step = 0;
-  step = p * error;
-  prevError = error;
-  return step;
-
-}
 
 
 float measure() {
@@ -201,7 +214,7 @@ float measure() {
 
     //Plot force
     if (plotCount = 1000 && i != -1000) {
-      Serial.println(String(i) + "," + String(targetF) + "," + String(displacement * 10));
+      Serial.println("DATA: ," + String(i) + "," + String(targetF) + "," + String(displacement) + "," + String(maxCompression) + "," + String(timePermm));
       plotCount = 0;
     } else {
       plotCount++;
@@ -214,14 +227,19 @@ float measure() {
 
 }
 
-void move(float dist) {
+float move(float dist) {
   //postive values compress
   //dist is measured in mm
   float pitch = 1;
   float revolutions = dist / pitch;
   int steps = stepsPerRevolution * revolutions;
 
+  float trueDisplacementChange = steps * (pitch / stepsPerRevolution);
+  displacement += trueDisplacementChange;
+
   myStepper.step(-steps);
+
+  return trueDisplacementChange;
 }
 
 void initialise() {
@@ -237,7 +255,8 @@ void initialise() {
     Serial.println(forceA);
   }
 
-  move(-1);
+  float trueStep; //just a placeholder 
+  trueStep = move(-1);
   delay(1000);
   float forceB = measure();
   forceB = measure();
@@ -248,7 +267,7 @@ void initialise() {
   while (abs(forceA - forceB) > 0.1) {
     delay(100);
     forceA = measure();
-    move(-0.5);
+    trueStep = move(-0.5);
     forceB = measure();
     Serial.print("Force A:  ");
     Serial.print(forceA);
@@ -279,14 +298,14 @@ void initialise() {
     Serial.println(forceA);
   }
 
-  move(0.5);
+  trueStep = move(0.5);
   forceB = measure();
   Serial.print("Force B:  ");
   Serial.println(forceB);
 
   while (abs(forceA - forceB) < 0.3) {
     delay(10);
-    move(0.05);
+    trueStep = move(0.05);
     forceB = measure();
     Serial.print("Force A:  ");
     Serial.print(forceA);

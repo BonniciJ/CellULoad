@@ -54,7 +54,7 @@ void setup() {
     //Serial.println("Startup is complete");
   }
 
-  initialise();
+  //initialise();
 
 
 }
